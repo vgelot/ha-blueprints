@@ -19,13 +19,13 @@ blueprint:
     controller_device:
       name: (Required) Controller Device
       description: The controller device which will control the Light. Choose a value only if the integration used to connect the controller to Home Assistant exposes it as a Device. This value should match the one specified in the corresponding Controller automation.
-      default: ""
+      default: ''
       selector:
         device:
     controller_entity:
       name: (Required) Controller Entity
       description: The controller entity which will control the Light. Choose a value only if the integration used to connect the controller to Home Assistant exposes it as an Entity. This value should match the one specified in the corresponding Controller automation.
-      default: ""
+      default: ''
       selector:
         entity:
           domain: sensor
@@ -380,9 +380,12 @@ variables:
   light_color_mode_id: >-
     {%- if light_color_mode == "Auto" -%} {% set supported_color_modes = state_attr(light, "supported_color_modes") -%} {%- if "hs" in supported_color_modes or "xy" in supported_color_modes or "rgbw" in supported_color_modes or "rgbww" in supported_color_modes -%} {{
     color_modes["Hue - Saturation"] }} {%- elif "color_temp" in supported_color_modes -%} {{ color_modes["Color Temperature"] }} {%- else -%} {{ color_modes["None"] }} {%- endif -%} {%- else -%} {{ color_modes[light_color_mode] }} {%- endif -%}
-  step_short: "{{ (max_brightness-min_brightness)/brightness_steps_short }}"
-  step_long: "{{ (max_brightness-min_brightness)/brightness_steps_long }}"
-  step_short_color: "{{ (state_attr(light,'max_mireds')-state_attr(light,'min_mireds'))/(color_steps_short-1) }}"
+  step_short: '{{ (max_brightness-min_brightness)/brightness_steps_short }}'
+  step_long: '{{ (max_brightness-min_brightness)/brightness_steps_long }}'
+  step_short_color: >-
+    {% set supported_color_modes = state_attr(light, "supported_color_modes") -%} {%- if "color_temp" in supported_color_modes -%} {{ (state_attr(light,"max_mireds") - state_attr(light,"min_mireds")) / (color_steps_short-1) }} {%- else -%} 1 {%- endif -%}
+  #step_short_color: '3'
+  #step_short_color: "{{ (state_attr(light,'max_mireds')-state_attr(light,'min_mireds'))/(color_steps_short-1) | default(50) }}"
 
 mode: restart
 
@@ -402,45 +405,45 @@ condition: []
 
 action:
   - variables:
-      action: "{{ trigger.event.data.action }}"
+      action: '{{ trigger.event.data.action }}'
   - choose:
-      - conditions: "{{ action == toggle }}"
+      - conditions: '{{ action == toggle }}'
         sequence:
           - choose:
-              - conditions: "{{ force_brightness }}"
+              - conditions: '{{ force_brightness }}'
                 sequence:
                   - service: light.toggle
                     entity_id: !input light
                     data:
                       brightness: !input on_brightness
-                      transition: "{{ light_transition / 1000 }}"
+                      transition: '{{ light_transition / 1000 }}'
             default:
               - service: light.toggle
                 entity_id: !input light
                 data:
-                  transition: "{{ light_transition / 1000 }}"
-      - conditions: "{{ action == turn_on }}"
+                  transition: '{{ light_transition / 1000 }}'
+      - conditions: '{{ action == turn_on }}'
         sequence:
           - choose:
-              - conditions: "{{ force_brightness }}"
+              - conditions: '{{ force_brightness }}'
                 sequence:
                   - service: light.turn_on
                     entity_id: !input light
                     data:
                       brightness: !input on_brightness
-                      transition: "{{ light_transition / 1000 }}"
+                      transition: '{{ light_transition / 1000 }}'
             default:
               - service: light.turn_on
                 entity_id: !input light
                 data:
-                  transition: "{{ light_transition / 1000 }}"
-      - conditions: "{{ action == turn_off }}"
+                  transition: '{{ light_transition / 1000 }}'
+      - conditions: '{{ action == turn_off }}'
         sequence:
           - service: light.turn_off
             entity_id: !input light
             data:
-              transition: "{{ light_transition / 1000 }}"
-      - conditions: "{{ action == brightness_up }}"
+              transition: '{{ light_transition / 1000 }}'
+      - conditions: '{{ action == brightness_up }}'
         sequence:
           - choose:
               # if light is off and smooth power on is disabled, turn it on at the previously saved brightness
@@ -448,15 +451,15 @@ action:
                 sequence:
                   - service: light.turn_on
                     data:
-                      transition: "{{ light_transition / 1000 }}"
+                      transition: '{{ light_transition / 1000 }}'
                       entity_id: !input light
               # if light is off and smooth power on is enabled, turn it on at minimum brightness
               - conditions: '{{ states(light) == "off" and smooth_power_on}}'
                 sequence:
                   - service: light.turn_on
                     data:
-                      brightness: "{{ min_brightness }}"
-                      transition: "{{ light_transition / 1000 }}"
+                      brightness: '{{ min_brightness }}'
+                      transition: '{{ light_transition / 1000 }}'
                       entity_id: !input light
             # else the light is on, hence increase its brightness
             default:
@@ -472,7 +475,7 @@ action:
                 sequence:
                   - service: light.turn_off
                     data:
-                      transition: "{{ light_transition / 1000 }}"
+                      transition: '{{ light_transition / 1000 }}'
                       entity_id: !input light
             default:
               - service: light.turn_on
@@ -480,7 +483,7 @@ action:
                   brightness: '{{ [ [state_attr(light,"brightness")-step_short, min_brightness] | max, max_brightness] | min }}'
                   transition: 0.25
                   entity_id: !input light
-      - conditions: "{{ action == brightness_up_repeat }}"
+      - conditions: '{{ action == brightness_up_repeat }}'
         sequence:
           # first step for the smooth power on feature: subsequent steps can skip this check since light will be already on
           - choose:
@@ -489,7 +492,7 @@ action:
                 sequence:
                   - service: light.turn_on
                     data:
-                      transition: "{{ light_transition / 1000 }}"
+                      transition: '{{ light_transition / 1000 }}'
                       entity_id: !input light
                   - delay:
                       milliseconds: !input light_transition
@@ -498,14 +501,14 @@ action:
                 sequence:
                   - service: light.turn_on
                     data:
-                      brightness: "{{ min_brightness }}"
-                      transition: "{{ light_transition / 1000 }}"
+                      brightness: '{{ min_brightness }}'
+                      transition: '{{ light_transition / 1000 }}'
                       entity_id: !input light
                   - delay:
                       milliseconds: !input light_transition
           # else move on to the loop for increasing the light brightness
           - repeat:
-              while: "{{ true }}"
+              while: '{{ true }}'
               sequence:
                 - service: light.turn_on
                   data:
@@ -518,7 +521,7 @@ action:
         sequence:
           - choose:
               # using a separate sequence for the smooth power off feature to not perform unnecessary checks at every iteration when the feature is disabled
-              - conditions: "{{ smooth_power_off }}"
+              - conditions: '{{ smooth_power_off }}'
                 sequence:
                   - repeat:
                       # continue lowering brightness until the light turns off
@@ -530,7 +533,7 @@ action:
                               sequence:
                                 - service: light.turn_off
                                   data:
-                                    transition: "{{ light_transition / 1000 }}"
+                                    transition: '{{ light_transition / 1000 }}'
                                     entity_id: !input light
                                 - delay:
                                     milliseconds: !input light_transition
@@ -596,7 +599,7 @@ action:
             - conditions: '{{ light_color_mode_id == "color_temp" }}'
               sequence:
                 - repeat:
-                    while: "{{ true }}"
+                    while: '{{ true }}'
                     sequence:
                       - service: light.turn_on
                         data:
@@ -608,7 +611,7 @@ action:
             - conditions: '{{ light_color_mode_id == "hs_color" }}'
               sequence:
                 - repeat:
-                    while: "{{ true }}"
+                    while: '{{ true }}'
                     sequence:
                       - service: light.turn_on
                         data:
@@ -623,7 +626,7 @@ action:
             - conditions: '{{ light_color_mode_id == "color_temp" }}'
               sequence:
                 - repeat:
-                    while: "{{ true }}"
+                    while: '{{ true }}'
                     sequence:
                       - service: light.turn_on
                         data:
@@ -635,7 +638,7 @@ action:
             - conditions: '{{ light_color_mode_id == "hs_color" }}'
               sequence:
                 - repeat:
-                    while: "{{ true }}"
+                    while: '{{ true }}'
                     sequence:
                       - service: light.turn_on
                         data:
@@ -644,37 +647,3 @@ action:
                         entity_id: !input light
                       - delay:
                           milliseconds: 250
-      - conditions: '{{ action == color_up_cycle and states(light) == "on" and light_color_mode_id != "none" }}'
-        sequence:
-          choose:
-            - conditions: '{{ light_color_mode_id == "color_temp" and state_attr(light,"color_temp") == state_attr(light,"max_mireds") }}'
-              sequence:
-                - service: light.turn_on
-                  data:
-                    color_temp: '{{ state_attr(light,"min_mireds") }}'
-                    transition: 0.25
-                  entity_id: !input light
-            - conditions: '{{ light_color_mode_id == "color_temp" }}'
-              sequence:
-                - service: light.turn_on
-                  data:
-                    color_temp: '{{ state_attr(light,"color_temp")|int + step_short_color - (state_attr(light,"color_temp")|int % step_short_color) }}'
-                    transition: 0.25
-                  entity_id: !input light
-      - conditions: '{{ action == color_down_cycle and states(light) == "on" and light_color_mode_id != "none" }}'
-        sequence:
-          choose:
-            - conditions: '{{ light_color_mode_id == "color_temp" and state_attr(light,"color_temp") == state_attr(light,"min_mireds") }}'
-              sequence:
-                - service: light.turn_on
-                  data:
-                    color_temp: '{{ state_attr(light,"max_mireds") }}'
-                    transition: 0.25
-                  entity_id: !input light
-            - conditions: '{{ light_color_mode_id == "color_temp" }}'
-              sequence:
-                - service: light.turn_on
-                  data:
-                    color_temp: '{{ state_attr(light,"color_temp")|int - step_short_color + ((step_short_color - (state_attr(light,"color_temp")|int % step_short_color)) % step_short_color) }}'
-                    transition: 0.25
-                  entity_id: !input light
