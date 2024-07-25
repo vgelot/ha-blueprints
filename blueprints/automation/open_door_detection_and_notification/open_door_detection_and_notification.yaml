@@ -1,0 +1,66 @@
+blueprint:
+  name: Open door detection & notification for all open door sensors
+  description: Regularly test all door sensors and if so execute an action.
+  domain: automation
+  input:
+    time:
+      name: Time to test on
+      description: Test is run at configured time
+      default: '22:00:00'
+      selector:
+        time: {}
+    day:
+      name: Weekday to test on
+      description: 'Test is run at configured time either everyday (0) or on a given
+        weekday (1: Monday ... 7: Sunday)'
+      default: 0
+      selector:
+        number:
+          min: 0.0
+          max: 7.0
+          mode: slider
+          step: 1.0
+    exclude:
+      name: Excluded Sensors
+      description: Open door sensors (e.g. bedroom) to exclude from detection. Only entities are supported, devices must be expanded!
+      default: {entity_id: []}
+      selector:
+        target:
+          entity:
+            device_class: door
+    actions:
+      name: Actions
+      description: Notifications or similar to be run. {{sensors}} is replaced with the names of sensors being open.
+      selector:
+        action: {}
+  source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/open_door_detection_and_notification/open_door_detection_and_notification.yaml
+
+variables:
+  day: !input 'day'
+  exclude: !input 'exclude'
+  sensors: >-
+    {% set result = namespace(sensors=[]) %}
+    {% for state in states.sensor | selectattr('attributes.device_class', '==', 'door') %}
+      {% if state.state == 'on' and not state.entity_id in exclude.entity_id %}
+        {% set result.sensors = result.sensors + [state.name] %}
+      {% endif %}
+    {% endfor %}
+    {% for state in states.binary_sensor | selectattr('attributes.device_class', '==', 'door') %}
+      {% if state.state == 'on' and not state.entity_id in exclude.entity_id %}
+        {% set result.sensors = result.sensors + [state.name] %}
+      {% endif %}
+    {% endfor %}
+    {{result.sensors|join(', ')}}
+
+trigger:
+- platform: time
+  at: !input 'time'
+
+condition:
+- '{{ sensors != '''' and (day | int == 0 or day | int == now().isoweekday()) }}'
+
+action:
+- choose: []
+  default: !input 'actions'
+
+mode: single
