@@ -43,6 +43,15 @@ blueprint:
       default: 15
   source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/sunrise_alarm/sunrise_alarm.yaml
 
+trigger_variables:
+  wakeup_time: !input wakeup_time
+  sunrise_duration: !input transition_duration
+
+trigger:
+- platform: template
+  value_template: >
+    {{ now().strftime('%H:%M:%S') == (strptime(wakeup_time, '%H:%M:%S') - timedelta(minutes=sunrise_duration)).strftime('%H:%M:%S') }}
+
 variables:
   wakeup_days: !input wakeup_days
   target_light: !input target_light
@@ -53,10 +62,6 @@ variables:
   min_brightness: 15
   max_brightness: 255
   brightness_transition: "{{ ((max_brightness-min_brightness)/step_transition_number_not_null) }}"
-
-trigger:
-  - platform: time
-    at: !input wakeup_time
 
 condition:
   - condition: template
