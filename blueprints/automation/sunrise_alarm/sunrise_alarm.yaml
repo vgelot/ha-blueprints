@@ -41,6 +41,17 @@ blueprint:
           mode: slider
           step: 5
       default: 15
+    light_duration:
+      name: (Required) Light duration kept
+      description: Time to keep the light lighted at maximum brightness (in minutes).
+      selector:
+        number:
+          min: 5
+          max: 180
+          unit_of_measurement: minutes
+          mode: slider
+          step: 5
+      default: 60
   source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/sunrise_alarm/sunrise_alarm.yaml
 
 trigger_variables:
@@ -62,6 +73,7 @@ variables:
   min_brightness: 15
   max_brightness: 255
   brightness_transition: "{{ ((max_brightness-min_brightness)/step_transition_number_not_null) }}"
+  light_duration: !input light_duration
 
 condition:
   - condition: template
@@ -82,5 +94,10 @@ action:
     data:
       entity_id: "{{ target_light }}"
       brightness: "{{ max_brightness }}"
+  - delay:
+      minutes: "{{ light_duration }}"
+  - service: light.turn_off
+    data:
+      entity_id: "{{ target_light }}"
 
 mode: single
