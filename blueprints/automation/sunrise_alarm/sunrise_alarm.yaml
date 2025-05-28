@@ -7,50 +7,54 @@ blueprint:
       name: (Required) Wakeup Time
       description: Time when the lights should start to turn on.
       selector:
-        time:
-      default: "07:00:00"
+        time: {}
+      default: 07:00:00
     wakeup_days:
       name: (Required) Warkup days
       description: Days of the week when the automation is active.
       selector:
         select:
           options:
-            - Monday
-            - Tuesday
-            - Wednesday
-            - Thursday
-            - Friday
-            - Saturday
-            - Sunday
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Friday
+          - Saturday
+          - Sunday
           mode: list
           multiple: true
+          custom_value: false
+          sort: false
     target_light:
       name: (Required) Light
       description: The light to turn on.
       selector:
         entity:
-          domain: light
+          domain:
+          - light
+          multiple: false
     transition_duration:
       name: (Required) Transition duration
       description: Time to transition from minimum to maximum brightness (in minutes).
       selector:
         number:
-          min: 0
-          max: 30
+          min: 0.0
+          max: 30.0
           unit_of_measurement: minutes
           mode: slider
-          step: 5
+          step: 5.0
       default: 15
     light_duration:
       name: (Required) Light duration kept
       description: Time to keep the light lighted at maximum brightness (in minutes).
       selector:
         number:
-          min: 5
-          max: 180
+          min: 5.0
+          max: 180.0
           unit_of_measurement: minutes
           mode: slider
-          step: 5
+          step: 5.0
       default: 60
   source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/sunrise_alarm/sunrise_alarm.yaml
 
@@ -60,44 +64,42 @@ trigger_variables:
 
 trigger:
 - platform: template
-  value_template: >
-    {{ now().strftime('%H:%M:%S') == (strptime(wakeup_time, '%H:%M:%S') - timedelta(minutes=sunrise_duration)).strftime('%H:%M:%S') }}
+  value_template: '{{ now().strftime(''%H:%M:%S'') == (strptime(wakeup_time, ''%H:%M:%S'') - timedelta(minutes=sunrise_duration)).strftime(''%H:%M:%S'') }}'
 
 variables:
   wakeup_days: !input wakeup_days
   target_light: !input target_light
   transition_duration: !input transition_duration
   step_transition_duration: 5
-  step_transition_number: "{{ (transition_duration/step_transition_duration) }}"
-  step_transition_number_not_null: "{{ [step_transition_number,1] | max }}"
+  step_transition_number: '{{ (transition_duration/step_transition_duration) }}'
+  step_transition_number_not_null: '{{ [step_transition_number,1] | max }}'
   min_brightness: 15
   max_brightness: 255
-  brightness_transition: "{{ ((max_brightness-min_brightness)/step_transition_number_not_null) }}"
+  brightness_transition: '{{ ((max_brightness-min_brightness)/step_transition_number_not_null) }}'
   light_duration: !input light_duration
 
 condition:
-  - condition: template
-    value_template: >
-      {{ now().strftime('%A') in wakeup_days }}
+- condition: template
+  value_template: '{{ now().strftime(''%A'') in wakeup_days }}'
 
 action:
-  - repeat:
-      count: "{{ step_transition_number }}"
-      sequence:
-        - service: light.turn_on
-          data:
-            entity_id: "{{ target_light }}"
-            brightness: "{{ (max_brightness - (brightness_transition*(step_transition_number-repeat.index+1))) }}"
-        - delay:
-            minutes: "{{ step_transition_duration }}"
-  - service: light.turn_on
-    data:
-      entity_id: "{{ target_light }}"
-      brightness: "{{ max_brightness }}"
-  - delay:
-      minutes: "{{ light_duration }}"
-  - service: light.turn_off
-    data:
-      entity_id: "{{ target_light }}"
+- repeat:
+    count: '{{ step_transition_number }}'
+    sequence:
+    - service: light.turn_on
+      data:
+        entity_id: '{{ target_light }}'
+        brightness: '{{ (max_brightness - (brightness_transition*(step_transition_number-repeat.index+1))) }}'
+    - delay:
+        minutes: '{{ step_transition_duration }}'
+- service: light.turn_on
+  data:
+    entity_id: '{{ target_light }}'
+    brightness: '{{ max_brightness }}'
+- delay:
+    minutes: '{{ light_duration }}'
+- service: light.turn_off
+  data:
+    entity_id: '{{ target_light }}'
 
 mode: single
