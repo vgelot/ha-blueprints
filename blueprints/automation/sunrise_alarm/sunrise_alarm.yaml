@@ -10,7 +10,7 @@ blueprint:
         time: {}
       default: 07:00:00
     wakeup_days:
-      name: (Required) Warkup days
+      name: (Required) Wakeup days
       description: Days of the week when the automation is active.
       selector:
         select:
