@@ -38,7 +38,7 @@ blueprint:
 variables:
   day: !input 'day'
   exclude: !input 'exclude'
-  sensors: >-
+  sensors: >
     {% set result = namespace(sensors=[]) %}
     {% for state in states.sensor | selectattr('attributes.device_class', '==', 'door') %}
       {% if state.state == 'on' and not state.entity_id in exclude.entity_id %}
@@ -50,14 +50,15 @@ variables:
         {% set result.sensors = result.sensors + [state.name] %}
       {% endif %}
     {% endfor %}
-    {{result.sensors|join(', ')}}
+    {{ result.sensors | join(', ') }}
 
 trigger:
 - platform: time
   at: !input 'time'
 
 condition:
-- '{{ sensors != '''' and (day | int == 0 or day | int == now().isoweekday()) }}'
+- condition: template
+  value_template: '{{ sensors != '''' and (day | int == 0 or day | int == now().isoweekday()) }}'
 
 action:
 - choose: []
