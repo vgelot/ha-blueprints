@@ -24,17 +24,23 @@ blueprint:
       default: '10:00:00'
       selector:
         time: {}
-    day:
-      name: Weekday to test on
-      description: 'Test is run at configured time either everyday (0) or on a given
-        weekday (1: Monday ... 7: Sunday)'
-      default: 0
+    days:
+      name: (Required) Days
+      description: Days of the week when the automation is active.
       selector:
-        number:
-          min: 0.0
-          max: 7.0
-          mode: slider
-          step: 1.0
+        select:
+          options:
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Friday
+          - Saturday
+          - Sunday
+          mode: list
+          multiple: true
+          custom_value: false
+          sort: false
     exclude:
       name: Excluded Sensors
       description: Battery sensors (e.g. smartphone) to exclude from detection. Only
@@ -54,7 +60,7 @@ blueprint:
         action: {}
   source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/low_battery_detection_and_notification/low_battery_detection_and_notification.yaml
 variables:
-  day: !input day
+  days: !input days
   threshold: !input threshold
   exclude: !input exclude
   sensors: >
@@ -75,7 +81,7 @@ trigger:
     at: !input time
 condition:
   - condition: template
-    value_template: '{{ sensors != '''' and (day | int == 0 or day | int == now().isoweekday()) }}'
+    value_template: '{{ sensors != '''' and now().strftime(''%A'') in days }}'
 action:
   - choose: []
     default: !input actions

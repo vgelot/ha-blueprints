@@ -9,17 +9,23 @@ blueprint:
       default: '22:00:00'
       selector:
         time: {}
-    day:
-      name: Weekday to test on
-      description: 'Test is run at configured time either everyday (0) or on a given
-        weekday (1: Monday ... 7: Sunday)'
-      default: 0
+    days:
+      name: (Required) Days
+      description: Days of the week when the automation is active.
       selector:
-        number:
-          min: 0.0
-          max: 7.0
-          mode: slider
-          step: 1.0
+        select:
+          options:
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Friday
+          - Saturday
+          - Sunday
+          mode: list
+          multiple: true
+          custom_value: false
+          sort: false
     exclude:
       name: Excluded Sensors
       description: Open door sensors (e.g. bedroom) to exclude from detection. Only entities are supported, devices must be expanded!
@@ -36,7 +42,7 @@ blueprint:
   source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/open_door_detection_and_notification/open_door_detection_and_notification.yaml
 
 variables:
-  day: !input 'day'
+  days: !input days
   exclude: !input 'exclude'
   sensors: >
     {% set result = namespace(sensors=[]) %}
@@ -58,7 +64,7 @@ trigger:
 
 condition:
 - condition: template
-  value_template: '{{ sensors != '''' and (day | int == 0 or day | int == now().isoweekday()) }}'
+  value_template: '{{ sensors != '''' and now().strftime(''%A'') in days }}'
 
 action:
 - choose: []
