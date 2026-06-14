@@ -1,0 +1,192 @@
+blueprint:
+  name: Vacuum robot scheduler with charging management
+  description: >
+    Automatically run a vacuum robot on a schedule.
+    Optionally turns on a smart plug to charge the robot, waits until it is
+    sufficiently charged, starts the cleaning cycle, then turns off the plug
+    once the robot has returned to its dock. Handles cases where the robot is
+    not available (not docked at trigger time).
+  domain: automation
+  input:
+    vacuum_device:
+      name: (Required) Vacuum robot device
+      description: The vacuum robot device to control.
+      selector:
+        device:
+          integration: vacuum
+
+    vacuum_entity:
+      name: (Required) Vacuum robot entity
+      description: The main vacuum entity (used to detect docked/cleaning state).
+      selector:
+        entity:
+          domain: vacuum
+
+    vacuum_battery_entity:
+      name: (Required) Vacuum battery sensor
+      description: The battery level sensor entity of the vacuum robot (in %).
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+
+    time:
+      name: (Required) Time to trigger
+      description: Time at which the automation will trigger.
+      default: '12:00:00'
+      selector:
+        time: {}
+
+    days:
+      name: (Required) Days
+      description: Days of the week when the automation is active.
+      selector:
+        select:
+          options:
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Friday
+          - Saturday
+          - Sunday
+          mode: list
+          multiple: true
+          custom_value: false
+          sort: false
+
+    plug_entity:
+      name: Smart plug (optional)
+      description: >
+        The smart plug powering the robot's charging dock.
+        If left empty, the plug will not be controlled.
+      default: ''
+      selector:
+        entity:
+          domain: switch
+
+    battery_threshold:
+      name: Battery threshold to start
+      description: >
+        Minimum battery percentage required before starting the robot.
+        The robot will wait until this level is reached before cleaning.
+      default: 100
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 5
+          unit_of_measurement: '%'
+          mode: slider
+
+    charge_timeout:
+      name: Maximum charging duration (minutes)
+      description: >
+        Maximum time allowed for the robot to charge up to the defined threshold.
+        If this delay is exceeded, the robot will start anyway with its current charge.
+      default: 120
+      selector:
+        number:
+          min: 10
+          max: 480
+          step: 10
+          unit_of_measurement: minutes
+          mode: slider
+
+    return_timeout_time:
+      name: Deadline for returning to dock
+      description: >
+        If the robot has not returned to its dock by this time, the plug will
+        be turned off regardless. Set this late enough to cover the full cleaning cycle.
+      default: '16:00:00'
+      selector:
+        time: {}
+
+  source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/vacuum_scheduler/vacuum_scheduler.yaml
+
+variables:
+  days: !input days
+  plug_entity: !input plug_entity
+  vacuum_entity: !input vacuum_entity
+  battery_threshold: !input battery_threshold
+  charge_timeout: !input charge_timeout
+  has_plug: '{{ plug_entity != '''' }}'
+
+trigger:
+  - platform: time
+    at: !input time
+
+condition:
+  - condition: template
+    value_template: '{{ now().strftime(''%A'') in days }}'
+
+action:
+  # Step 1 — Turn on the plug (if configured) and wait for it to power up
+  - if:
+      - condition: template
+        value_template: '{{ has_plug }}'
+    then:
+      - action: switch.turn_on
+        target:
+          entity_id: !input plug_entity
+  - delay:
+      seconds: 5
+
+  # Step 2 — Check if robot is docked
+  - choose:
+      # Case A: robot is docked — charge then clean
+      - conditions:
+          - condition: state
+            entity_id: !input vacuum_entity
+            state: docked
+        sequence:
+          # Wait for battery to reach threshold (hard-coded 5-minute check interval)
+          - wait_for_trigger:
+              - platform: numeric_state
+                entity_id: !input vacuum_battery_entity
+                above: '{{ battery_threshold | int - 1 }}'
+            timeout:
+              minutes: '{{ charge_timeout }}'
+            continue_on_timeout: true
+
+          # Start cleaning
+          - action: vacuum.start
+            target:
+              device_id: !input vacuum_device
+
+          # Wait 5 minutes for the robot to leave its dock (hard-coded)
+          - delay:
+              minutes: 5
+
+          # Wait for robot to return to dock OR deadline is reached
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input vacuum_entity
+                to: docked
+                for:
+                  minutes: 2
+              - platform: time
+                at: !input return_timeout_time
+            continue_on_timeout: true
+
+          # Turn off plug
+          - if:
+              - condition: template
+                value_template: '{{ has_plug }}'
+            then:
+              - action: switch.turn_off
+                target:
+                  entity_id: !input plug_entity
+
+      # Case B: robot is not docked — turn off plug immediately
+      - conditions: []
+        sequence:
+          - if:
+              - condition: template
+                value_template: '{{ has_plug }}'
+            then:
+              - action: switch.turn_off
+                target:
+                  entity_id: !input plug_entity
+
+mode: single

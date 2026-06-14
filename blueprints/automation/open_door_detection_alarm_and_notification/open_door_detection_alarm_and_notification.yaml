@@ -1,0 +1,66 @@
+blueprint:
+  name: Door/Window alarm trigger
+  description: Triggers one or more alarms when a door or window is opened.
+    The alarm stops automatically after a configurable duration.
+    Individual sensors can be excluded.
+  domain: automation
+  input:
+    alarms:
+      name: (Required) Alarm(s) to trigger
+      description: Select one or more alarm switches to activate when an opening is detected (e.g. switch.alarm_living_room_alarm).
+      selector:
+        target:
+          entity:
+            domain: switch
+
+    alarm_duration:
+      name: (Required) Alarm duration
+      description: Duration before the alarm(s) stop automatically (default 15 minutes).
+      default: 15
+      selector:
+        number:
+          min: 1.0
+          max: 120.0
+          unit_of_measurement: minutes
+          mode: slider
+          step: 1.0
+
+    exclude:
+      name: Excluded Sensors
+      description: Door sensors to exclude from triggering the alarm. Only entities are supported, devices must be expanded!
+      default:
+        entity_id: []
+      selector:
+        target:
+          entity:
+          - device_class:
+            - door
+  source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/alarm_door_window/alarm_door_window.yaml
+
+variables:
+  exclude: !input exclude
+  opened_door: >
+    {% for state in states.binary_sensor | selectattr('attributes.device_class', '==', 'door') | selectattr('state', '==', 'on') %}
+      {% if not state.entity_id in exclude.entity_id %}
+        {{ state.entity_id }}
+      {% endif %}
+    {% endfor %}
+
+trigger:
+  - platform: template
+    value_template: "{{ opened_door | trim != '' }}"
+
+action:
+  - alias: Trigger alarms
+    service: switch.turn_on
+    target: !input alarms
+
+  - alias: Wait for configured duration
+    delay:
+      minutes: !input alarm_duration
+
+  - alias: Turn off alarms
+    service: switch.turn_off
+    target: !input alarms
+
+mode: restart
