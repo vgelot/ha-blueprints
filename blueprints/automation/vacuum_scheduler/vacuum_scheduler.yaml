@@ -6,18 +6,21 @@ blueprint:
     sufficiently charged, starts the cleaning cycle, then turns off the plug
     once the robot has returned to its dock. Handles cases where the robot is
     not available (not docked at trigger time).
-
-    The vacuum device and battery entity are automatically deduced from the
-    selected device — no need to configure them separately.
   domain: automation
   input:
-    vacuum_device:
-      name: (Required) Vacuum robot device
-      description: >
-        The vacuum robot device to control. Both the vacuum entity and the
-        battery sensor will be automatically resolved from this device.
+    vacuum_entity:
+      name: (Required) Vacuum robot entity
+      description: The main vacuum entity (used to detect docked/cleaning state and to start cleaning).
       selector:
-        device: {}
+        entity:
+          domain: vacuum
+
+    vacuum_battery_entity:
+      name: (Required) Vacuum battery sensor
+      description: The battery level sensor entity of the vacuum robot (in %).
+      selector:
+        entity:
+          device_class: battery
 
     time:
       name: (Required) Time to trigger
@@ -103,26 +106,11 @@ blueprint:
 variables:
   days: !input days
   plug_entity: !input plug_entity
-  vacuum_device: !input vacuum_device
+  vacuum_battery_entity: !input vacuum_battery_entity
   battery_threshold: !input battery_threshold
   charge_timeout: !input charge_timeout
   run_timeout: !input run_timeout
   has_plug: '{{ plug_entity != '''' }}'
-  # Resolve vacuum entity from device (domain: vacuum)
-  vacuum_entity: >
-    {{ device_entities(vacuum_device)
-       | select('match', 'vacuum\\..*')
-       | list
-       | first }}
-  # Resolve battery entity from device (device_class: battery)
-  vacuum_battery_entity: >
-    {% set ns = namespace(entity='') %}
-    {% for e in device_entities(vacuum_device) %}
-      {% if state_attr(e, 'device_class') == 'battery' %}
-        {% set ns.entity = e %}
-      {% endif %}
-    {% endfor %}
-    {{ ns.entity }}
 
 trigger:
   - platform: time
@@ -142,14 +130,15 @@ action:
         target:
           entity_id: !input plug_entity
   - delay:
-      seconds: 5
+      seconds: 60
 
   # Step 2 — Check if robot is docked
   - choose:
       # Case A: robot is docked — charge then clean
       - conditions:
-          - condition: template
-            value_template: '{{ states(vacuum_entity) == ''docked'' }}'
+          - condition: state
+            entity_id: !input vacuum_entity
+            state: docked
         sequence:
           # Wait for battery to reach threshold
           - wait_template: '{{ states(vacuum_battery_entity) | int(0) >= battery_threshold | int }}'
@@ -160,19 +149,19 @@ action:
           # Start cleaning
           - action: vacuum.start
             target:
-              entity_id: '{{ vacuum_entity }}'
+              entity_id: !input vacuum_entity
 
-          # Wait 5 minutes for the robot to leave its dock (hard-coded)
+          # Wait 120 seconds for the robot to leave its dock (hard-coded)
           - delay:
-              minutes: 5
+             seconds: 120
 
           # Wait for robot to return to dock OR maximum duration is reached
           - wait_for_trigger:
               - platform: state
-                entity_id: '{{ vacuum_entity }}'
+                entity_id: !input vacuum_entity
                 to: docked
                 for:
-                  minutes: 2
+                  minutes: 1
             timeout:
               minutes: '{{ run_timeout }}'
             continue_on_timeout: true
