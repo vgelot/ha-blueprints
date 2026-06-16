@@ -3,6 +3,7 @@ blueprint:
   description: Triggers one or more alarms when a door or window is opened.
     The alarm stops automatically after a configurable duration.
     Individual sensors can be excluded.
+    An optional notification can be sent when the alarm is triggered.
   domain: automation
   input:
     alarms:
@@ -35,25 +36,43 @@ blueprint:
           entity:
           - device_class:
             - door
-  source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/alarm_door_window/alarm_door_window.yaml
+
+    actions:
+      name: Notification Actions
+      description: >
+        Notifications or similar to be run when the alarm is triggered.
+        {{sensor}} is replaced with the name of the sensor that triggered the alarm.
+      default: []
+      selector:
+        action: {}
+  source_url: https://github.com/vgelot/ha-blueprints/blob/main/blueprints/automation/open_door_detection_alarm_and_notification/open_door_detection_alarm_and_notification.yaml
 
 variables:
   exclude: !input exclude
-  opened_door: >
-    {% for state in states.binary_sensor | selectattr('attributes.device_class', '==', 'door') | selectattr('state', '==', 'on') %}
-      {% if not state.entity_id in exclude.entity_id %}
-        {{ state.entity_id }}
-      {% endif %}
-    {% endfor %}
+  sensor: "{{ trigger.event.data.new_state.name }}"
 
 trigger:
-  - platform: template
-    value_template: "{{ opened_door | trim != '' }}"
+  - platform: event
+    event_type: state_changed
+
+condition:
+  - condition: template
+    value_template: >
+      {{
+        trigger.event.data.entity_id not in exclude.entity_id
+        and state_attr(trigger.event.data.entity_id, 'device_class') == 'door'
+        and trigger.event.data.new_state.state == 'on'
+        and trigger.event.data.old_state.state == 'off'
+      }}
 
 action:
   - alias: Trigger alarms
     service: switch.turn_on
     target: !input alarms
+
+  - alias: Send notifications
+    choose: []
+    default: !input actions
 
   - alias: Wait for configured duration
     delay:
