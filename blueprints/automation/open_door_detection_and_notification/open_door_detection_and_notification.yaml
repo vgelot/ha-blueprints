@@ -1,5 +1,5 @@
 blueprint:
-  name: Open door detection & notification for all open door sensors
+  name: Open door detection & daily notification
   description: Regularly test all door sensors and if so execute an action.
   domain: automation
   input:

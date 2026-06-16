@@ -1,5 +1,5 @@
 blueprint:
-  name: Door/Window alarm trigger
+  name: Open door detection & alarm & notification
   description: Triggers one or more alarms when a door or window is opened.
     The alarm stops automatically after a configurable duration.
     Individual sensors can be excluded.
